@@ -18,6 +18,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Verify Java version
+        run: java -version
+
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -37,6 +40,20 @@ jobs:
 
       - name: Sync Capacitor
         run: npx cap sync android
+
+      - name: Force Java 17 in Gradle
+        run: |
+          echo "org.gradle.jvmargs=-Xmx2048m" > android/gradle.properties
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
+
+          echo "" >> android/build.gradle
+          echo "allprojects {" >> android/build.gradle
+          echo "    tasks.withType(JavaCompile).configureEach {" >> android/build.gradle
+          echo "        sourceCompatibility = JavaVersion.VERSION_17.toString()" >> android/build.gradle
+          echo "        targetCompatibility = JavaVersion.VERSION_17.toString()" >> android/build.gradle
+          echo "    }" >> android/build.gradle
+          echo "}" >> android/build.gradle
 
       - name: Build AAB
         run: cd android && ./gradlew :app:bundleRelease
