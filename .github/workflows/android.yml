@@ -1,4 +1,4 @@
-name: Build Android AAB
+name: Build Signed Android AAB
 
 on:
   push:
@@ -8,67 +8,71 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
 
     steps:
+      # -------------------------
+      # Checkout Code
+      # -------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ------------------------
-      # SETUP NODE (Capacitor requires >=18, we use 20 LTS)
-      # ------------------------
-      - name: Setup Node.js
+      # -------------------------
+      # Setup Node 22 (Capacitor requires this)
+      # -------------------------
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      # ------------------------
-      # SETUP JAVA 17 (IMPORTANT – fixes "invalid source release 21")
-      # ------------------------
+      # -------------------------
+      # Setup Java 17 (Stable for Android)
+      # -------------------------
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      # ------------------------
-      # INSTALL NPM DEPENDENCIES
-      # ------------------------
+      # -------------------------
+      # Install Dependencies
+      # -------------------------
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
 
-      # ------------------------
-      # BUILD WEB (Vite/React/etc)
-      # ------------------------
+      # -------------------------
+      # Build Web App
+      # -------------------------
       - name: Build web
         run: npm run build
 
-      # ------------------------
-      # SYNC CAPACITOR
-      # ------------------------
+      # -------------------------
+      # Sync Capacitor
+      # -------------------------
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # ------------------------
-      # DECODE KEYSTORE INTO android/app
-      # ------------------------
+      # -------------------------
+      # Decode Keystore into android/app
+      # -------------------------
       - name: Decode keystore
         run: |
           cd android/app
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > my-release-key.jks
           ls -l my-release-key.jks
 
-      # ------------------------
-      # GRANT PERMISSION TO GRADLE
-      # ------------------------
+      # -------------------------
+      # Make Gradle Executable
+      # -------------------------
       - name: Make gradlew executable
         run: |
           cd android
           chmod +x gradlew
 
-      # ------------------------
-      # BUILD SIGNED AAB
-      # ------------------------
+      # -------------------------
+      # Build Signed AAB
+      # -------------------------
       - name: Build Signed AAB
         run: |
           cd android
@@ -78,9 +82,9 @@ jobs:
           -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
           -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
-      # ------------------------
-      # UPLOAD AAB AS ARTIFACT
-      # ------------------------
+      # -------------------------
+      # Upload AAB Artifact
+      # -------------------------
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
