@@ -11,80 +11,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # -------------------------
-      # Checkout Code
-      # -------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -------------------------
-      # Setup Node 22 (Capacitor requires this)
-      # -------------------------
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      # -------------------------
-      # Setup Java 17 (Stable for Android)
-      # -------------------------
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      # -------------------------
-      # Install Dependencies
-      # -------------------------
       - name: Install dependencies
-        run: |
-          npm install
+        run: npm install
 
-      # -------------------------
-      # Build Web App
-      # -------------------------
       - name: Build web
         run: npm run build
 
-      # -------------------------
-      # Sync Capacitor
-      # -------------------------
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # -------------------------
-      # Decode Keystore into android/app
-      # -------------------------
       - name: Decode keystore
         run: |
           cd android/app
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > my-release-key.jks
           ls -l my-release-key.jks
 
-      # -------------------------
-      # Make Gradle Executable
-      # -------------------------
-      - name: Make gradlew executable
-        run: |
-          cd android
-          chmod +x gradlew
-
-      # -------------------------
-      # Build Signed AAB
-      # -------------------------
       - name: Build Signed AAB
         run: |
           cd android
+          chmod +x gradlew
           ./gradlew :app:bundleRelease \
           -Pandroid.injected.signing.store.file=app/my-release-key.jks \
           -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
           -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
           -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
-      # -------------------------
-      # Upload AAB Artifact
-      # -------------------------
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
