@@ -18,21 +18,27 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Verify Java version
+      - name: Verify Java
         run: java -version
 
-      - name: Set up Node.js 22
+      - name: Set up Node 20 (stable for Capacitor v5)
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
 
-      - name: Install dependencies
-        run: npm install
+      - name: Clean install dependencies
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
+
+      - name: Force Capacitor v5 (Java 17 compatible)
+        run: |
+          npm install @capacitor/core@5 @capacitor/cli@5 @capacitor/android@5
 
       - name: Build web
         run: npm run build
 
-      - name: Remove existing android folder
+      - name: Remove android if exists
         run: rm -rf android || true
 
       - name: Add Android platform
@@ -41,7 +47,7 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Force Java 17 in Gradle
+      - name: Force Java 17 in Android Gradle
         run: |
           echo "org.gradle.jvmargs=-Xmx2048m" > android/gradle.properties
           echo "android.useAndroidX=true" >> android/gradle.properties
