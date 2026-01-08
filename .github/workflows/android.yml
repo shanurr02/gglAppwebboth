@@ -1,8 +1,9 @@
-name: Build Android AAB
+name: Build Signed Android AAB
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   build:
@@ -21,12 +22,12 @@ jobs:
       - name: Verify Java
         run: java -version
 
-      - name: Set up Node 20 (stable for Capacitor v5)
+      - name: Set up Node 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Clean install dependencies
+      - name: Install dependencies
         run: |
           rm -rf node_modules package-lock.json
           npm install
@@ -35,10 +36,10 @@ jobs:
         run: |
           npm install @capacitor/core@5 @capacitor/cli@5 @capacitor/android@5
 
-      - name: Build web
+      - name: Build Web
         run: npm run build
 
-      - name: Remove android if exists
+      - name: Remove old android folder
         run: rm -rf android || true
 
       - name: Add Android platform
@@ -47,7 +48,7 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Force Java 17 in Android Gradle
+      - name: Force Java 17 compatibility
         run: |
           echo "org.gradle.jvmargs=-Xmx2048m" > android/gradle.properties
           echo "android.useAndroidX=true" >> android/gradle.properties
@@ -61,8 +62,19 @@ jobs:
           echo "    }" >> android/build.gradle
           echo "}" >> android/build.gradle
 
-      - name: Build AAB
-        run: cd android && ./gradlew :app:bundleRelease
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > my-release-key.jks
+
+      - name: Build Signed AAB
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew :app:bundleRelease \
+          -Pandroid.injected.signing.store.file=../my-release-key.jks \
+          -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+          -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+          -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
