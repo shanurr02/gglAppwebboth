@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies
+      - name: Clean install dependencies
         run: |
           rm -rf node_modules package-lock.json
           npm install
@@ -62,16 +62,18 @@ jobs:
           echo "    }" >> android/build.gradle
           echo "}" >> android/build.gradle
 
-      - name: Decode keystore
+      - name: Decode keystore (inside android folder)
         run: |
+          cd android
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > my-release-key.jks
+          ls -l my-release-key.jks
 
       - name: Build Signed AAB
         run: |
           cd android
           chmod +x gradlew
           ./gradlew :app:bundleRelease \
-          -Pandroid.injected.signing.store.file=../my-release-key.jks \
+          -Pandroid.injected.signing.store.file=my-release-key.jks \
           -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
           -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
           -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
