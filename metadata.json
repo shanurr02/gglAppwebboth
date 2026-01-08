@@ -1,0 +1,8 @@
+
+{
+  "name": "Goearns Global Learning",
+  "description": "An international platform for education and income growth. Learn. Earn. Grow together.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
