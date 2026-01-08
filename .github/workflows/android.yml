@@ -1,85 +1,88 @@
-name: Build Signed Android AAB
+name: Build Android AAB
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Verify Java
-        run: java -version
-
-      - name: Set up Node 20
+      # ------------------------
+      # SETUP NODE (Capacitor requires >=18, we use 20 LTS)
+      # ------------------------
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Clean install dependencies
-        run: |
-          rm -rf node_modules package-lock.json
-          npm install
+      # ------------------------
+      # SETUP JAVA 17 (IMPORTANT – fixes "invalid source release 21")
+      # ------------------------
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-      - name: Force Capacitor v5 (Java 17 compatible)
-        run: |
-          npm install @capacitor/core@5 @capacitor/cli@5 @capacitor/android@5
+      # ------------------------
+      # INSTALL NPM DEPENDENCIES
+      # ------------------------
+      - name: Install dependencies
+        run: npm install
 
-      - name: Build Web
+      # ------------------------
+      # BUILD WEB (Vite/React/etc)
+      # ------------------------
+      - name: Build web
         run: npm run build
 
-      - name: Remove old android folder
-        run: rm -rf android || true
-
-      - name: Add Android platform
-        run: npx cap add android
-
+      # ------------------------
+      # SYNC CAPACITOR
+      # ------------------------
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Force Java 17 compatibility
+      # ------------------------
+      # DECODE KEYSTORE INTO android/app
+      # ------------------------
+      - name: Decode keystore
         run: |
-          echo "org.gradle.jvmargs=-Xmx2048m" > android/gradle.properties
-          echo "android.useAndroidX=true" >> android/gradle.properties
-          echo "android.enableJetifier=true" >> android/gradle.properties
-
-          echo "" >> android/build.gradle
-          echo "allprojects {" >> android/build.gradle
-          echo "    tasks.withType(JavaCompile).configureEach {" >> android/build.gradle
-          echo "        sourceCompatibility = JavaVersion.VERSION_17.toString()" >> android/build.gradle
-          echo "        targetCompatibility = JavaVersion.VERSION_17.toString()" >> android/build.gradle
-          echo "    }" >> android/build.gradle
-          echo "}" >> android/build.gradle
-
-      - name: Decode keystore (inside android folder)
-        run: |
-          cd android
+          cd android/app
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > my-release-key.jks
           ls -l my-release-key.jks
 
-      - name: Build Signed AAB
+      # ------------------------
+      # GRANT PERMISSION TO GRADLE
+      # ------------------------
+      - name: Make gradlew executable
         run: |
           cd android
           chmod +x gradlew
+
+      # ------------------------
+      # BUILD SIGNED AAB
+      # ------------------------
+      - name: Build Signed AAB
+        run: |
+          cd android
           ./gradlew :app:bundleRelease \
-          -Pandroid.injected.signing.store.file=my-release-key.jks \
+          -Pandroid.injected.signing.store.file=app/my-release-key.jks \
           -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
           -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
           -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
+      # ------------------------
+      # UPLOAD AAB AS ARTIFACT
+      # ------------------------
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-aab
+          name: app-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
